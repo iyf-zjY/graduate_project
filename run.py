@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import torch
 import torch.nn.functional as F
+from torch.nn.utils import clip_grad_norm_
 import torch.optim as optim
 import os,sys
 
@@ -20,7 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='Disables CUDA training.')
     parser.add_argument('--seed', type=int, default=45, help='Random seed.')
-    parser.add_argument('-opt', '--optimizer', default='SGD')
+    parser.add_argument('-opt', '--optimizer', default='Adam')
     parser.add_argument('--epochs', type=int, default=50,
                         help='Number of epochs to train.')
     parser.add_argument('--lr', type=float, default=0.05,
@@ -31,6 +32,10 @@ if __name__ == '__main__':
                         help='Number of hidden units.')
     parser.add_argument('--dropout', type=float, default=0.0,
                         help='Dropout rate (1 - keep probability).')
+    parser.add_argument('--clip', type=float, default=10.0,
+                        help='gradient clipping by norm')
+    parser.add_argument('--dynamic_lr', type=bool, default=False,
+                        help='tuning learning rate dynamically')
     # parser.add_argument('--training_percent', type=float, default=0.7,
     #                     help='percentage of data used for training')
     # parser.add_argument('--valid_percent', type=float, default=0.15,
@@ -117,6 +122,7 @@ if __name__ == '__main__':
             acc_train = accuracy(output, label)
             acc_train_list.append(acc_train.item())
             loss_train.backward()
+            clip_grad_norm_(model.parameters(), args.clip)
             optimizer.step()
             # validation
         model.eval()
