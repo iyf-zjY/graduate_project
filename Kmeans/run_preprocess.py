@@ -1,4 +1,3 @@
-import pymysql
 import numpy as np
 import math
 import os
@@ -9,10 +8,10 @@ from sklearn import preprocessing
 global stock_idx
 from xml.etree import ElementTree as ET
 
-attr='close'
+attr='open'
 #time_interval = ET.parse(conf).getroot()[1].text.strip()
-time_interval = '190601-190930'
-data_dir = 'data/price_data/'+time_interval+'/hs300/'
+time_interval = '170601-191129'
+data_dir = 'data/price_data/'+time_interval + '/hs300/'
 
 def read_data(attr):
     with open(data_dir+attr+'.csv','r') as f:
@@ -47,13 +46,13 @@ def main():
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
 
-    with open(out_dir + 'z_scored_' + time_interval + '.csv', 'w', newline='') as f:
+    with open(out_dir + attr +'_' + 'z_scored_' + time_interval + '.csv', 'w', newline='') as f:
         w = csv.writer(f)
         w.writerows(Data)
-    with open(out_dir + 'stock_idx_' + time_interval + '.txt', 'w') as f:
+    with open(out_dir+attr +'_' + 'stock_idx_' + time_interval + '.txt', 'w') as f:
         for s in stock_idx:
             f.write(s + '\n')
-    with open(out_dir + 'up_and_down_' + time_interval + '.csv', 'w', newline='') as f:
+    with open(out_dir+attr +'_' + 'up_and_down_' + time_interval + '.csv', 'w', newline='') as f:
         w = csv.writer(f)
         w.writerows(Data_triple)
 
