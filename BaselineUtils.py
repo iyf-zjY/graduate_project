@@ -7,9 +7,10 @@ from pygcn.pygcn.utils import *
 from utils import generate_hs300_feats
 import torch
 import os
+import pickle
 
 
-def init_info(train_dataset, test_dataset):
+def init_info(train_dataset, test_dataset, need_hs300=False):
     attrs_list = ["close", "open", "high", "low", "volume"]
     train_data_name = train_dataset
     train_dir = 'data/price_data/' + train_data_name + '/'
@@ -25,7 +26,7 @@ def init_info(train_dataset, test_dataset):
 
     all_features = []  # 5*295*len
     test_all_features = []
-    for attr in attrs_list: #五个维度的特征都load进来
+    for attr in attrs_list:  #五个维度的特征都load进来
         with open(os.path.join(train_dir, train_z_scored_file.format(attr)), 'r') as f:
             all_features.append(list(csv.reader(f)))
         with open(os.path.join(test_dir, test_z_scored_file.format(attr)), 'r') as f:
@@ -64,22 +65,25 @@ def init_info(train_dataset, test_dataset):
     train_idx = [t[0].replace('s', '') for t in train_idx]
     test_idx = [t[0].replace('s', '') for t in test_idx]
 
-    all_hs300_features = []
-    test_all_hs300_features = []
-    for attr in attrs_list:
-        with open(os.path.join(train_dir, train_hs300_file.format(attr)), 'r') as f:
-            all_hs300_features.append(np.array(list(csv.reader(f)), dtype=np.float32).flatten())
-        with open(os.path.join(test_dir, test_hs300_file.format(attr)), 'r') as f:
-            test_all_hs300_features.append(np.array(list(csv.reader(f)), dtype=np.float32).flatten())
+    train_hs300_z_scored_data = None
+    test_hs300_z_scored_data = None
+    if need_hs300:
+        all_hs300_features = []
+        test_all_hs300_features = []
+        for attr in attrs_list:
+            with open(os.path.join(train_dir, train_hs300_file.format(attr)), 'r') as f:
+                all_hs300_features.append(np.array(list(csv.reader(f)), dtype=np.float32).flatten())
+            with open(os.path.join(test_dir, test_hs300_file.format(attr)), 'r') as f:
+                test_all_hs300_features.append(np.array(list(csv.reader(f)), dtype=np.float32).flatten())
 
-    train_hs300_z_scored_data = np.array([
-        [t[i] for t in all_hs300_features]
-        for i in range(len(all_hs300_features[0]))
-    ], dtype=np.float32)
-    test_hs300_z_scored_data = np.array([
-        [t[i] for t in test_all_hs300_features]
-        for i in range(len(test_all_hs300_features[0]))
-    ], dtype=np.float32)
+        train_hs300_z_scored_data = np.array([
+            [t[i] for t in all_hs300_features]
+            for i in range(len(all_hs300_features[0]))
+        ], dtype=np.float32)
+        test_hs300_z_scored_data = np.array([
+            [t[i] for t in test_all_hs300_features]
+            for i in range(len(test_all_hs300_features[0]))
+        ], dtype=np.float32)
     return train_z_scored_data_dict, train_z_scored_data, train_idx, train_hs300_z_scored_data, \
            test_z_scored_data_dict, test_z_scored_data, test_idx, test_hs300_z_scored_data
 
@@ -131,9 +135,10 @@ def gen_samples_DA_RNN(features, seq_len_features, predict_window, gen_sample_in
     return features_list, labels_list
 
 
-def generate_samples_SFM(features, file_name, multiVar=False):
+def generate_samples_SFM(features, file_name, dataset_name, multiVar=False):
     features_list = []
-    save_path = "data/SFM_forWWW/" if not multiVar else "data/SFM_forWWW_multiVar/"
+    save_path = "data/SFM_forIJCAI_{}/".format(dataset_name) if not multiVar \
+        else "data/SFM_forIJCAI_multiVar_{}/".format(dataset_name)
     if not os.path.exists(save_path):
         os.mkdir(save_path)
     for i in range(features.shape[0]):
@@ -203,8 +208,8 @@ def generate_samples_InceptionTime_hs300(features, seq_len_features, predict_win
     return features_list, labels_list
 
 
-def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="191130-200530", seq_len_features=60,
-                              predict_window=14, gen_sample_interval=1, model='normal',
+def load_data_and_gen_samples(train_dataset="HS300_170601-191129", test_dataset="HS300_191202-200529", seq_len_features=60,
+                              predict_window=7, gen_sample_interval=1, model='normal',
                               weighted_graph=None, weighted_graph_file=None, hs300_dedicate=False):
     print('Loading {} {} dataset...'.format(train_dataset, test_dataset))
     z_scored_data_dict, features, idx, train_hs300, \
@@ -221,20 +226,21 @@ def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="19113
                                                                 hs300_dedicate, test_hs300)
         save_as_pickle([feature_list,label_list,test_feature_list, test_label_list],
                        ['features_list', 'labels_list', 'test_features_list', 'test_labels_list'],
-                       'data/pickle_seq{}_pwin{}_intv_{}_DARNN_ForWWW_hs300/'.format(seq_len_features,
-                                                                               predict_window, gen_sample_interval))
+                       'data/pickle_seq{}_pwin{}_intv_{}_DARNN_ForIJCAI_{}/'.format(seq_len_features,
+                                                                               predict_window, gen_sample_interval,
+                                                                                    train_dataset.split('_')[0]))
     elif model == 'SFM':
         if not hs300_dedicate:
-            generate_samples_SFM(features, "train_")
-            generate_samples_SFM(test_features, "test_")
+            generate_samples_SFM(features, train_dataset.split('_')[0], "train_")
+            generate_samples_SFM(test_features, train_dataset.split('_')[0], "test_")
         else:
             generate_samples_SFM_HS300(train_hs300, "train_")
             generate_samples_SFM_HS300(test_hs300, "test_")
 
     elif model == 'SFM_multiVar':
         if not hs300_dedicate:
-            generate_samples_SFM(features, "train_", multiVar=True)
-            generate_samples_SFM(test_features, "test_", multiVar=True)
+            generate_samples_SFM(features, train_dataset.split('_')[0], "train_", multiVar=True)
+            generate_samples_SFM(test_features, train_dataset.split('_')[0],  "test_", multiVar=True)
         else:
             generate_samples_SFM_HS300(train_hs300, "train_", multiVar=True)
             generate_samples_SFM_HS300(test_hs300, "test_", multiVar=True)
@@ -275,10 +281,13 @@ def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="19113
                 from utils import normalize_adj
                 adj = normalize_adj(adj + sp.eye(adj.shape[0]))
         else:
-            with open(weighted_graph_file, 'r') as f:
-                adj = np.load(weighted_graph_file)
-                print(adj.shape)
-                input()
+            with open(weighted_graph_file, 'rb') as f:
+                adj = pickle.load(f)
+                adj = np.array(adj[2])
+                adj = sp.coo_matrix(adj, shape=(adj.shape[0], adj.shape[1]), dtype=np.float32)
+                from utils import normalize_adj
+                adj = normalize_adj(adj + sp.eye(adj.shape[0]))
+
         features_list, labels_list = generate_samples_GCN(features, seq_len_features, predict_window,
                                                       gen_sample_interval,model, hs300_dedicate, train_hs300)
         test_features_list, test_labels_list = generate_samples_GCN(test_features, seq_len_features, predict_window,
@@ -287,12 +296,12 @@ def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="19113
         adj = sparse_mx_to_torch_sparse_tensor(adj)
         save_as_pickle([adj, features_list, labels_list, test_features_list, test_labels_list],
                        ['adj', 'features_list', 'labels_list', 'test_features_list', 'test_labels_list'],
-                       'data/pickle_seq{}_pwin{}_intv{}_GCN_forWWW_hs300/'.format(seq_len_features, predict_window,
-                                                                        gen_sample_interval))
+                       'data/pickle_seq{}_pwin{}_intv{}_GCN_forIJCAI_{}/'.format(seq_len_features, predict_window,
+                                                                        gen_sample_interval, train_dataset.split('_')[0]))
 
     elif model == 'InceptionTime':
         features_list, labels_list = generate_samples_GCN(features, seq_len_features, predict_window,
-                                                         gen_sample_interval, model,hs300_dedicate, train_hs300) \
+                                                         gen_sample_interval, model, hs300_dedicate, train_hs300) \
             if not hs300_dedicate else generate_samples_InceptionTime_hs300(
             features, seq_len_features, predict_window,
             gen_sample_interval, model, hs300_dedicate, train_hs300)
@@ -306,8 +315,8 @@ def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="19113
         test_features_list = np.array(test_features_list)
         test_labels_list = np.array(test_labels_list)
         print(features_list.shape, labels_list.shape, test_features_list.shape, test_labels_list.shape)
-        save_path = 'data/InceptionTime_seq{}_pwin{}_intv{}_WWW_hs300/'.format(seq_len_features, predict_window,
-                                                         gen_sample_interval)
+        save_path = 'data/InceptionTime_seq{}_pwin{}_intv{}_IJCAI_{}/'.format(seq_len_features, predict_window,
+                                                         gen_sample_interval, train_dataset.split('_')[0])
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         np.save(save_path + "X_TRAIN.npy", features_list)
@@ -318,5 +327,5 @@ def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="19113
 
 if __name__ == '__main__':
     load_data_and_gen_samples(model='GCN',
-                              weighted_graph=True, weighted_graph_file='data/ssn/fixed_ssn_line.csv',
+                              weighted_graph=True, weighted_graph_file='data/IJCAI2020Expr/newhs300_adj_industry.pkl',
                               hs300_dedicate=False)
