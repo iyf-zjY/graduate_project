@@ -1,5 +1,7 @@
 import pickle
 import scipy.sparse as sp
+import numpy as np
+import csv
 from Kmeans.Kmeans_cDTW_DBA import DBA_iteration
 from pygcn.pygcn.utils import *
 from utils import generate_hs300_feats
@@ -243,35 +245,40 @@ def load_data_and_gen_samples(train_dataset="170601-191129", test_dataset="19113
 
         # 一些股票停盘的之类的，舆情有 但是没数据 删除这些股票
         ignore_edge_idx = []
-
-        with open(weighted_graph_file, 'r') as f:
-            reader = csv.reader(f)
-            edges_unordered = []
-            for edge_idx, edge_info in enumerate(reader):
-                edge_info = edge_info[0].split(' ')
-                if edge_info[0] not in idx_map.keys() or edge_info[1] not in idx_map.keys():
-                    ignore_edge_idx.append(edge_idx)
-                    continue
-                edges_unordered.append([edge_info[0], edge_info[1]])
-        edges_unordered = np.array(edges_unordered, dtype=np.dtype(str))
-
-        edges = np.array(list(map(idx_map.get, edges_unordered.flatten())),
-                         dtype=np.int32).reshape(edges_unordered.shape)
-        adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
-                            shape=(features.shape[0], features.shape[0]),
-                            dtype=np.float32)
-        if weighted_graph:
+        if 'pkl' not in weighted_graph_file:
             with open(weighted_graph_file, 'r') as f:
-                weight_edges = csv.reader(f)
-                adj_dok = adj.todok()
-                for edge_idx, weight_edge_info in enumerate(weight_edges):
-                    if edge_idx in ignore_edge_idx:
+                reader = csv.reader(f)
+                edges_unordered = []
+                for edge_idx, edge_info in enumerate(reader):
+                    edge_info = edge_info[0].split(' ')
+                    if edge_info[0] not in idx_map.keys() or edge_info[1] not in idx_map.keys():
+                        ignore_edge_idx.append(edge_idx)
                         continue
-                    i, j, w = weight_edge_info[0].split(' ')
-                    adj_dok[idx_map[i], idx_map[j]] = int(w)
-            adj = adj_dok.tocoo()
-            from utils import normalize_adj
-            adj = normalize_adj(adj + sp.eye(adj.shape[0]))
+                    edges_unordered.append([edge_info[0], edge_info[1]])
+            edges_unordered = np.array(edges_unordered, dtype=np.dtype(str))
+
+            edges = np.array(list(map(idx_map.get, edges_unordered.flatten())),
+                             dtype=np.int32).reshape(edges_unordered.shape)
+            adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
+                                shape=(features.shape[0], features.shape[0]),
+                                dtype=np.float32)
+            if weighted_graph:
+                with open(weighted_graph_file, 'r') as f:
+                    weight_edges = csv.reader(f)
+                    adj_dok = adj.todok()
+                    for edge_idx, weight_edge_info in enumerate(weight_edges):
+                        if edge_idx in ignore_edge_idx:
+                            continue
+                        i, j, w = weight_edge_info[0].split(' ')
+                        adj_dok[idx_map[i], idx_map[j]] = int(w)
+                adj = adj_dok.tocoo()
+                from utils import normalize_adj
+                adj = normalize_adj(adj + sp.eye(adj.shape[0]))
+        else:
+            with open(weighted_graph_file, 'r') as f:
+                adj = np.load(weighted_graph_file)
+                print(adj.shape)
+                input()
         features_list, labels_list = generate_samples_GCN(features, seq_len_features, predict_window,
                                                       gen_sample_interval,model, hs300_dedicate, train_hs300)
         test_features_list, test_labels_list = generate_samples_GCN(test_features, seq_len_features, predict_window,

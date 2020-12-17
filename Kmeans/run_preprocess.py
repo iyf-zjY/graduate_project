@@ -8,10 +8,13 @@ from sklearn import preprocessing
 global stock_idx
 from xml.etree import ElementTree as ET
 
-attr='open'
+attr='volume'
 #time_interval = ET.parse(conf).getroot()[1].text.strip()
 time_interval = '170601-191129'
 data_dir = 'data/price_data/'+time_interval + '/hs300/'
+
+data_dir = 'C:\\Users\\16000\Desktop\IJCAI2020Expr\data_all\hs300\\'
+
 
 def read_data(attr):
     with open(data_dir+attr+'.csv','r') as f:
@@ -58,4 +61,4 @@ def main():
 
 
 if __name__ == '__main__':
-    pass
+    main()
